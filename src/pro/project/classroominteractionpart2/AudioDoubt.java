@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -31,6 +32,7 @@ public class AudioDoubt extends Activity implements OnClickListener {
 		super.onCreate(savedInstanceState);
 		//Log.e("Starting", "audiodoubt");
 		setContentView(R.layout.activity_audio_doubt);
+		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 		//Log.e("Started", "audiodoubt");
 		init(); // INITIALIZE VARIABLES
 		receiver(); // RECEIVE STATUS FROM SERVER

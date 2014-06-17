@@ -14,6 +14,7 @@ JNIEXPORT void JNICALL Java_pro_project_classroominteractionpart2_AudioSession_J
      st = speex_echo_state_init(jBufSize, jTotalSize);
      den = speex_preprocess_state_init(jBufSize, sampleRate);
      speex_echo_ctl(st, SPEEX_ECHO_SET_SAMPLING_RATE, &sampleRate);
+
      speex_preprocess_ctl(den, SPEEX_PREPROCESS_SET_ECHO_STATE, st);
 }
 
@@ -30,10 +31,36 @@ JNIEXPORT jshortArray JNICALL Java_pro_project_classroominteractionpart2_AudioSe
   jshort *native_output_frame = (*env)->GetShortArrayElements(env, temp, 0);
 
   //call echo cancellation
-//  speex_echo_cancellation(st, native_input_frame, native_echo_frame, native_output_frame);
+
+
+
+
+
+
+  /******************ADIL CHANGED THE CODE************************/
+
+
+  speex_echo_playback(st, native_echo_frame);
+
+  speex_echo_capture(st, native_echo_frame, native_output_frame);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  //speex_echo_cancellation(st, native_input_frame, native_echo_frame, native_output_frame);
   //preprocess output frame
-  speex_echo_playback(st,native_echo_frame);
-  speex_echo_capture(st,native_input_frame, native_output_frame);
   speex_preprocess_run(den, native_output_frame);
 
   //convert native output to java layer output
