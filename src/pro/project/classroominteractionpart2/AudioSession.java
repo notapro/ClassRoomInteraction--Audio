@@ -1,6 +1,6 @@
 package pro.project.classroominteractionpart2;
 
-import static android.media.MediaRecorder.AudioSource.MIC;
+import static android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -8,23 +8,38 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.regex.Pattern;
 
 import android.media.AudioFormat;
 import android.media.AudioRecord;
+import android.media.AudioTrack;
+import android.media.MediaRecorder.AudioSource;
 import android.util.Log;
 
 public class AudioSession {
+	static {
+		System.loadLibrary("speex");
+	}
+	private native void Java_speex_EchoCanceller_open
+	  (int jSampleRate, int jBufSize, int jTotalSize); 
+	
+	private native short[] Java_speex_EchoCanceller_process
+	  (short[] input_frame, short[] echo_frame);
+	
+	private native void Java_speex_EchoCanceller_close();
+	
 	private boolean isRecording = false;
 	public AudioRecord recorder;
-	private int port = 50005;
-	private int sampleRate = 44100;
+	private int port = 50006;
+	private int sampleRate = AudioTrack.getNativeOutputSampleRate(AudioSource.VOICE_COMMUNICATION);
 	private int channelConfig = AudioFormat.CHANNEL_IN_MONO;
 	private int encodingFormat = AudioFormat.ENCODING_PCM_16BIT;
 	int minBufSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig,
-			encodingFormat) + 4096;
+			encodingFormat)+4096;
 	int bufferSize = 0;
-	public String ipAddress = "10.105.15.15";
+	public String ipAddress = "10.105.43.47";
 	private static final String IPV4_NUM = "([01]?\\d\\d?|2[0-4]\\d|25[0-5])"; // REGULAR
 																				// EXPRESSION
 																				// FOR
@@ -41,6 +56,7 @@ public class AudioSession {
 			recorder.stop();
 			recorder.release();
 			recorder = null;
+			Java_speex_EchoCanceller_close();
 
 		}
 
@@ -49,6 +65,7 @@ public class AudioSession {
 	public void startStreaming() { // START AUDIO RECORDING
 		// ipAddress=getIpAddress();
 		// port=getPort();
+		  
 		if (!isValidIPAddressAndPort(ipAddress, port))
 			return; // CHECK FOR VALID IP AND PORT
 		// recordButton.setEnabled(false);
@@ -58,32 +75,65 @@ public class AudioSession {
 			@Override
 			public void run() {
 				try {
+					short[] recordedShorts, filteredShorts;
+					byte[] audioBytes;
+					
 					socket = new DatagramSocket(); // INITIALIZE SOCKET TO READ
 													// PACKETS
-					byte[] buffer = new byte[minBufSize];
+				//	Java_speex_EchoCanceller_open(sampleRate, minBufSize/2, 100);
+					Log.e("minBufSize", minBufSize+"");
+					Java_speex_EchoCanceller_open(sampleRate, minBufSize/2, 4*sampleRate/10);
 					DatagramPacket packet;
 					final InetAddress destination = InetAddress
 							.getByName(ipAddress);
-					// Log.e("before recorder", "about to initialize");
-					recorder = new AudioRecord(MIC, sampleRate, channelConfig,
-							encodingFormat, minBufSize * 10); // INITIALIZE
+					 Log.e("before recorder", "about to initialize");
+					recorder = new AudioRecord(VOICE_COMMUNICATION, sampleRate, channelConfig,
+							encodingFormat, minBufSize*10); // INITIALIZE
 																// RECORDER
 					// test starts
 					// test ends
+					recordedShorts = new short[minBufSize/2];
+					//recvShorts = new short[minBufSize/2];
+					audioBytes = new byte[minBufSize];
+					
 					if (recorder.getState() == AudioRecord.STATE_INITIALIZED) // CHECK
 																				// IF
-																				// RECORDER
+					{														// RECORDER
 																				// INITIALIZED
 						recorder.startRecording();
+						recorder.read(recordedShorts, 0, recordedShorts.length);
+						ByteBuffer.wrap(audioBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(recordedShorts);
+						
+						//bufferSize = recorder.read(recordedShorts, 0, recordedShorts.length);
+					}
 					else
 						Log.e("not initialized", "kuch aur kar");
 
 					while (isRecording) { // KEEP ON RECORDING IN PARALLEL
 											// UNTILL STOP STREAMING IS CALLED
-						bufferSize = recorder.read(buffer, 0, buffer.length);
-						packet = new DatagramPacket(buffer, buffer.length,
+					/*	recorder.read(recvShorts, 0, recvShorts.length);
+						filteredShorts = Java_speex_EchoCanceller_process(recordedShorts, recvShorts);
+						audioBytes = new byte[bufferSize*2];
+						ByteBuffer.wrap(audioBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(filteredShorts);
+						packet = new DatagramPacket(audioBytes, audioBytes.length,
 								destination, port);
 						socket.send(packet);
+					*/	Log.e("Filtered bytes",audioBytes.length+"");
+					//	Log.e("1","1");
+						packet = new DatagramPacket(audioBytes, audioBytes.length,
+								destination, port);
+					//	Log.e("2","2");
+						socket.send(packet);
+					//	Log.e("3","3");
+						recorder.read(audioBytes, 0, audioBytes.length);
+						ByteBuffer.wrap(audioBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(recordedShorts);
+					//	Log.e("4","4");
+						filteredShorts = Java_speex_EchoCanceller_process(recordedShorts, recordedShorts);
+					//	Log.e("Filtered shorts", filteredShorts.length+"");
+					//	Log.e("5","5");
+						ByteBuffer.wrap(audioBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(filteredShorts);
+					//	ByteBuffer.wrap(audioBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().put(recordedShorts);
+						
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -125,7 +175,7 @@ public class AudioSession {
 					socket1 = new DatagramSocket();
 					socket1.send(new DatagramPacket(request, request.length,
 							destination, port));
-					// Log.e("REquest", "Ssnt");
+					 Log.e("REquest", "Ssnt");
 					while (waitingForPermission())
 						; // SEND PERMISSION
 				} catch (SocketException e) {
@@ -151,14 +201,14 @@ public class AudioSession {
 
 		DatagramPacket receivePacket = new DatagramPacket(receiveData,
 				receiveData.length);
-		// Log.e("waiting", "to receive");
+		 Log.e("waiting", "to receive");
 		socket2.receive(receivePacket);
-		// Log.e("Received","received");
+		 Log.e("Received","received");
 		final String requestText = new String(receivePacket.getData()); // RECEIVE
 																		// PACKET
 																		// FROM
 																		// SERVER
-		// Log.d("requestText",requestText);
+		 Log.d("requestText",requestText);
 		socket2.close();
 		if (requestText.contains(PERMISSION_TEXT)) { // IF PERMISSION RECEIVED,
 														// START STREAMING

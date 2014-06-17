@@ -88,8 +88,8 @@ public class AudioDoubt extends Activity implements OnClickListener {
 			if (as != null) {
 				as.onWithdrawPress();	//CANCEL AUDIO REQUEST OR STOP AUDIO MESSAGE
 			}
-			back=new Intent(AudioDoubt.this, MainActivity.class);
-			startActivity(back);
+			//back=new Intent(AudioDoubt.this, MainActivity.class);
+			//startActivity(back);
 			finish();	//FINISH THIS ACTIVITY
 			break;
 		}
